@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mohla ID Card Maker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Arimo:ital,wght@0,400;0,700;1,700&family=Noto+Serif:wght@700&family=Roboto+Condensed:wght@400;700&family=Hind:wght@400;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* Layout: form on top, front + back card previews below; side by side on wide screens */
+:root{
+  --bg:#f3f6f2; --surface:#ffffff; --fg:#17251c; --muted:#56665b;
+  --line:#cfd9d1; --accent:#1f6b3c; --accent-ink:#ffffff; --field:#ffffff;
+  --display:'Roboto Condensed','Arial Narrow',sans-serif;
+  --body:'Hind','Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1712; --surface:#17221b; --fg:#e4ede6; --muted:#9db0a2;
+  --line:#2c3b31; --accent:#4fb377; --accent-ink:#0b1a10; --field:#101912; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1712; --surface:#17221b; --fg:#e4ede6; --muted:#9db0a2;
+  --line:#2c3b31; --accent:#4fb377; --accent-ink:#0b1a10; --field:#101912; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;margin:0}
+.wrap{max-width:1240px;margin:0 auto;padding-block:20px 28px;padding-inline:16px;display:flex;flex-direction:column;gap:18px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:700;font-size:26px;margin:0;letter-spacing:.3px;text-wrap:balance}
+h2{font-family:var(--display);font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:6px 0 0}
+.sub{color:var(--muted);margin:2px 0 0;font-size:15px}
+.logout{color:var(--accent);font-weight:600;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:8px 14px;min-height:44px;display:inline-flex;align-items:center}
+.grid{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.form{flex:1 1 320px;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:13px}
+.preview{flex:2 1 520px;min-width:0;display:flex;flex-direction:column;gap:10px}
+.side{font-family:var(--display);font-weight:700;color:var(--muted);font-size:14px;text-transform:uppercase;letter-spacing:1px}
+label,.lbl{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+input[type=text],textarea{font:inherit;font-size:17px;color:var(--fg);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:10px 12px;text-transform:none;letter-spacing:0;width:100%}
+textarea{resize:vertical;min-height:64px}
+.row2{display:flex;gap:10px;flex-wrap:wrap}.row2>label{flex:1 1 130px;min-width:0}
+input:focus-visible,textarea:focus-visible,button:focus-visible,.file:focus-within{outline:3px solid var(--accent);outline-offset:2px}
+/* the real file input covers the whole box, so a tap anywhere opens the picker */
+.file{position:relative;display:flex;align-items:center;gap:10px;border:1.5px dashed var(--accent);border-radius:10px;padding:12px;min-height:52px;color:var(--fg);text-transform:none;letter-spacing:0;font-size:16px;font-weight:400;overflow:hidden}
+.file input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:200px}
+.file b{color:var(--accent);white-space:nowrap}
+.file span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;color:var(--muted)}
+.btns{display:flex;flex-wrap:wrap;gap:10px}
+button{font:inherit;font-weight:600;font-size:16px;min-height:46px;padding:0 16px;border-radius:8px;border:1px solid var(--accent);cursor:pointer}
+.primary{background:var(--accent);color:var(--accent-ink)}
+.ghost{background:transparent;color:var(--accent)}
+canvas{width:100%;max-width:100%;height:auto;display:block;border-radius:3.6% / 5.7%;box-shadow:0 2px 14px rgba(0,0,0,.2)}
+.status{min-height:22px;color:var(--muted);font-size:14px}
+.hint{color:var(--muted);font-size:14px;margin:0}
+footer{border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font-size:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px}
+footer b{color:var(--fg)}
+[hidden]{display:none!important}
+.login{max-width:380px;width:calc(100% - 32px);margin:40px auto;padding:26px 22px;background:var(--surface);border:1px solid var(--line);border-top:6px solid var(--accent);border-radius:14px;display:flex;flex-direction:column;gap:14px}
+.login h1,.login .sub{text-align:center}
+.login .logos{display:flex;justify-content:center;gap:18px}.login .logos img{width:76px;height:76px;object-fit:contain}
+input[type=password]{font:inherit;font-size:17px;color:var(--fg);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%}
+.err{color:#b42318;font-weight:600;text-align:center;margin:0}
+</style>
+</head>
+<body>
+
+<form class="login" id="login" onsubmit="return false">
+  <div class="logos"><img src="emblem.png" alt="Government of Chhattisgarh"><img src="dept.png" alt="Forest and Climate Change Department"></div>
+  <h1>ID Card Maker · DFO Mohla</h1>
+  <p class="sub">Aage badhne ke liye login kariye</p>
+  <p class="err" id="lerr" hidden>ID ya password galat hai. Dobara try kariye.</p>
+  <label for="lid">User ID<input type="text" id="lid" autocomplete="username"></label>
+  <label for="lpw">Password<input type="password" id="lpw" autocomplete="current-password"></label>
+  <button type="submit" class="primary" id="lgo">Login</button>
+  <p class="sub" style="text-align:center">Website Developer: <b>Shubham Chaubey</b></p>
+</form>
+<div class="wrap" id="app" hidden>
+  <div class="top">
+    <div>
+      <h1>ID Card Maker · DFO Mohla</h1>
+      <p class="sub">Details bhariye, photo lagaiye. Card ka aage aur peeche ka hissa 4K (4096 px) quality mein banta hai.</p>
+    </div>
+    <button type="button" class="ghost" id="logout">Logout</button>
+  </div>
+  <div class="grid">
+    <form class="form" id="f" onsubmit="return false">
+      <h2>Front side</h2>
+      <label>Naam (Name)<input type="text" id="name" value="KUMAR" autocomplete="off"></label>
+      <label>Designation<input type="text" id="desig" value="" placeholder="jaise Forest Guard" autocomplete="off"></label>
+      <label>Employee ID<input type="text" id="empid" value="" placeholder="jaise CG-FD-0123" autocomplete="off"></label>
+      <label>Working Place<textarea id="place">Office of the Divisional Forest Officer Mohla(C.G.)</textarea></label>
+      <div class="lbl">Photo<div class="file"><input type="file" id="photo" accept="image/*" aria-label="Employee photo"><b>Photo chuniye</b><span id="photoN">koi photo nahi</span></div></div>
+      <h2>Back side</h2>
+      <div class="row2">
+        <label>Date of Birth<input type="text" id="dob" value="" placeholder="07.10.1992" autocomplete="off"></label>
+        <label>Blood Group<input type="text" id="blood" value="" placeholder="A+" autocomplete="off"></label>
+      </div>
+      <label>Contact<input type="text" id="contact" value="" placeholder="10 digit mobile" inputmode="tel" autocomplete="off"></label>
+      <div class="lbl">Holder's Signature (optional)<div class="file"><input type="file" id="sign" accept="image/*" aria-label="Signature photo"><b>Sign photo chuniye</b><span id="signN">koi sign nahi</span></div></div>
+      <div class="btns">
+        <button type="button" class="primary" id="pdf">Download PDF (dono side)</button>
+        <button type="button" class="ghost" id="pngF">Front PNG</button>
+        <button type="button" class="ghost" id="pngB">Back PNG</button>
+        <button type="button" class="ghost" id="clear">Naya card</button>
+      </div>
+      <div class="status" id="status" role="status"></div>
+    </form>
+    <div class="preview">
+      <div class="side">Front</div>
+      <canvas id="front" width="4096" height="2584" aria-label="ID card front preview"></canvas>
+      <div class="side">Back</div>
+      <canvas id="back" width="4096" height="2584" aria-label="ID card back preview"></canvas>
+      <p class="hint">PDF asli card size (85.6 × 54 mm) mein do page ki banti hai: page 1 front, page 2 back. PVC card printer ya A4 par seedha print kariye.</p>
+    </div>
+  </div>
+  <footer><span>Office of the Divisional Forest Officer, Mohla (C.G.)</span><span>Website Developer: <b>Shubham Chaubey</b></span></footer>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const UW=1585, UH=1000, W=4096, H=2584, K=W/UW;
+const GREEN='#1d5a35', DARK='#1b1b1b';
+const SERIF='"Noto Serif", Georgia, serif', ARIMO='Arimo, Arial, sans-serif', COND='"Roboto Condensed","Arial Narrow",sans-serif';
+const IN_CLAUDE=!!(window.claude&&window.claude.use);
+// Login (ID: Dfo, Password: password.2026). Only a hash is stored here.
+const PASS_HASH='97ca4dcd7e91374169176035f2493f017c6c11f31839eff2d1ca34b5b8ea9d41';
+async function sha(t){if(!(window.crypto&&crypto.subtle))return null;const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+function ss(k,v){try{if(v===undefined)return sessionStorage.getItem(k);if(v===null)sessionStorage.removeItem(k);else sessionStorage.setItem(k,v)}catch(_){return null}}
+function showApp(){$('login').hidden=true;$('app').hidden=false;setTimeout(draw,0)}
+if(ss('idc_ok')===PASS_HASH)showApp();
+$('login').addEventListener('submit',async()=>{
+  const h=await sha($('lid').value.trim().toLowerCase()+':'+$('lpw').value);
+  if(h===PASS_HASH){ss('idc_ok',h);$('lerr').hidden=true;showApp()}else{$('lerr').hidden=false}
+});
+$('logout').addEventListener('click',()=>{ss('idc_ok',null);$('lpw').value='';$('app').hidden=true;$('login').hidden=false});
+const imgs={};
+function load(key,src){return new Promise(r=>{const i=new Image();i.onload=()=>{imgs[key]=i;r()};i.onerror=()=>r();i.src=src})}
+const status=t=>{$('status').textContent=t};
+
+function rr(ctx,x,y,w,h,r){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h)}
+function setFont(ctx,w,s,f,style=''){ctx.font=`${style} ${w} ${s}px ${f}`}
+function fit(ctx,text,w,s,f,maxW,style=''){setFont(ctx,w,s,f,style);while(ctx.measureText(text).width>maxW&&s>14){s--;setFont(ctx,w,s,f,style)}return s}
+function serifLine(ctx,text,cx,y,size,maxW,color,sx=.82){
+  ctx.save();setFont(ctx,'700',size,SERIF);const w=ctx.measureText(text).width*sx;
+  if(w>maxW)sx*=maxW/w;
+  ctx.translate(cx,y);ctx.scale(sx,1);ctx.fillStyle=color;ctx.textAlign='center';ctx.fillText(text,0,0);ctx.restore();
+}
+function rand(seed){return()=>{seed=(seed*16807)%2147483647;return seed/2147483647}}
+
+function cardBase(ctx,{bottomStripe=false}={}){
+  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,W,H);ctx.scale(K,K);
+  const g=ctx.createLinearGradient(0,0,UW,UH);g.addColorStop(0,'#1f7a43');g.addColorStop(.5,'#2f9a58');g.addColorStop(1,'#1d6e3d');
+  rr(ctx,0,0,UW,UH,58);ctx.fillStyle=g;ctx.fill();
+  rr(ctx,14,14,UW-28,UH-28,46);ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=2;ctx.stroke();
+  rr(ctx,24,24,UW-48,UH-48,38);ctx.fillStyle='#fdfefc';ctx.fill();
+  ctx.save();rr(ctx,24,24,UW-48,UH-48,38);ctx.clip();
+  ctx.lineWidth=1.1;
+  for(let r=60;r<900;r+=13){
+    ctx.beginPath();
+    for(let a=0;a<=Math.PI*2+.01;a+=.02){
+      const rad=r+6*Math.sin(a*14+r*.05)+3*Math.sin(a*5);
+      const x=840+rad*Math.cos(a),y=560+rad*.78*Math.sin(a);
+      a?ctx.lineTo(x,y):ctx.moveTo(x,y);
+    }
+    ctx.strokeStyle=`rgba(60,110,80,${r<330?.05:.075})`;ctx.stroke();
+  }
+  for(let i=0;i<22;i++){
+    ctx.beginPath();
+    for(let y=0;y<=UH;y+=8){const x=1380+i*9+18*Math.sin(y/70+i*.4);y?ctx.lineTo(x,y):ctx.moveTo(x,y)}
+    ctx.strokeStyle='rgba(60,90,70,.06)';ctx.stroke();
+  }
+  if(imgs.emblem){ctx.globalAlpha=.1;ctx.drawImage(imgs.emblem,600,320,480,480*imgs.emblem.height/imgs.emblem.width);ctx.globalAlpha=1}
+  if(bottomStripe){
+    const s=ctx.createLinearGradient(0,930,0,UH);s.addColorStop(0,'#2f9a58');s.addColorStop(1,'#1f7a43');
+    ctx.fillStyle=s;ctx.fillRect(0,930,UW,UH-930);
+  }
+  ctx.restore();
+}
+function leaf(ctx,x,y,len,ang,color){
+  ctx.save();ctx.translate(x,y);ctx.rotate(ang);ctx.beginPath();
+  ctx.moveTo(0,0);ctx.bezierCurveTo(len*.3,-len*.32,len*.75,-len*.28,len,0);ctx.bezierCurveTo(len*.75,len*.28,len*.3,len*.32,0,0);
+  ctx.fillStyle=color;ctx.fill();
+  ctx.beginPath();ctx.moveTo(len*.05,0);ctx.lineTo(len*.92,0);ctx.strokeStyle='rgba(255,255,255,.45)';ctx.lineWidth=1.4;ctx.stroke();ctx.restore();
+}
+function tree(ctx,x,y,s,color){
+  ctx.save();ctx.fillStyle=color;ctx.fillRect(x-s*.06,y-s*.55,s*.12,s*.55);
+  ctx.beginPath();ctx.arc(x,y-s*.75,s*.32,0,Math.PI*2);ctx.arc(x-s*.25,y-s*.6,s*.22,0,Math.PI*2);ctx.arc(x+s*.25,y-s*.6,s*.22,0,Math.PI*2);ctx.fill();ctx.restore();
+}
+function band(ctx,x1,x2,y){
+  const h=20;ctx.save();ctx.beginPath();ctx.rect(x1,y,x2-x1,h);ctx.clip();
+  ctx.fillStyle='#2c7c48';ctx.fillRect(x1,y,x2-x1,h);
+  ctx.strokeStyle='rgba(205,240,215,.75)';ctx.lineWidth=2.2;
+  for(let x=x1-h;x<x2+h;x+=9){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+h,y+h);ctx.stroke();ctx.beginPath();ctx.moveTo(x+h,y);ctx.lineTo(x,y+h);ctx.stroke()}
+  ctx.restore();ctx.fillStyle='#1b5530';ctx.fillRect(x1,y-2,x2-x1,3);ctx.fillRect(x1,y+h-1,x2-x1,3);
+}
+function logo(ctx,img,cx,cy,r){
+  if(!img)return;const s=Math.min(2*r/img.width,2*r/img.height);
+  ctx.drawImage(img,cx-img.width*s/2,cy-img.height*s/2,img.width*s,img.height*s);
+}
+// hologram seal, drawn straight (no photo): rainbow foil + gold emblem
+let holoCache=null;
+function hologram(){
+  if(holoCache||!imgs.emblem)return holoCache;
+  const S=600,c=document.createElement('canvas');c.width=c.height=S;const x=c.getContext('2d');
+  rr(x,0,0,S,S,60);x.clip();
+  let g;if(x.createConicGradient){g=x.createConicGradient(.6,S/2,S/2);
+    ['#c9d6ff','#f5c6ff','#ffe6a8','#b8ffd9','#a8e6ff','#d7b8ff','#ffd1a8','#c9d6ff'].forEach((col,i,a)=>g.addColorStop(i/(a.length-1),col));}
+  else{g=x.createLinearGradient(0,0,S,S);g.addColorStop(0,'#c9d6ff');g.addColorStop(.5,'#ffe6a8');g.addColorStop(1,'#b8ffd9')}
+  x.fillStyle=g;x.fillRect(0,0,S,S);
+  x.globalAlpha=.25;x.strokeStyle='#ffffff';x.lineWidth=3;
+  for(let i=-S;i<S*2;i+=14){x.beginPath();x.moveTo(i,0);x.lineTo(i+S,S);x.stroke()}
+  x.globalAlpha=1;
+  const sh=x.createRadialGradient(S*.3,S*.25,10,S*.3,S*.25,S*.8);sh.addColorStop(0,'rgba(255,255,255,.75)');sh.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=sh;x.fillRect(0,0,S,S);
+  // gold ring
+  const gold=x.createLinearGradient(0,0,S,S);gold.addColorStop(0,'#8a6412');gold.addColorStop(.35,'#f3d27a');gold.addColorStop(.6,'#b8860b');gold.addColorStop(1,'#f7e19a');
+  x.strokeStyle=gold;x.lineWidth=16;x.beginPath();x.arc(S/2,S/2,S*.4,0,Math.PI*2);x.stroke();
+  x.lineWidth=5;x.beginPath();x.arc(S/2,S/2,S*.345,0,Math.PI*2);x.stroke();
+  // emblem tinted gold
+  const e=document.createElement('canvas');e.width=e.height=S;const ex=e.getContext('2d');
+  const es=S*.62,ew=es,eh=es*imgs.emblem.height/imgs.emblem.width;
+  ex.drawImage(imgs.emblem,(S-ew)/2,(S-eh)/2,ew,eh);
+  // keep only the inked parts of the emblem (drop its white paper) so it embosses like foil
+  const id=ex.getImageData(0,0,S,S),d=id.data;
+  for(let i=0;i<d.length;i+=4){const lum=(d[i]+d[i+1]+d[i+2])/3;d[i+3]=Math.min(d[i+3],Math.max(0,(250-lum)*1.8))}
+  ex.putImageData(id,0,0);ex.globalCompositeOperation='source-in';ex.fillStyle=gold;ex.fillRect(0,0,S,S);
+  x.globalAlpha=.92;x.drawImage(e,0,0);x.globalAlpha=1;
+  x.lineWidth=4;x.strokeStyle='rgba(120,90,20,.5)';rr(x,2,2,S-4,S-4,58);x.stroke();
+  holoCache=c;return c;
+}
+function coverDraw(ctx,img,x,y,w,h){const s=Math.max(w/img.width,h/img.height),sw=w/s,sh=h/s;ctx.drawImage(img,(img.width-sw)/2,(img.height-sh)/2,sw,sh,x,y,w,h)}
+function labelValue(ctx,label,value,x,y,size,maxRight,nextX,lh){
+  setFont(ctx,'400',size,COND);ctx.fillStyle=DARK;ctx.textAlign='left';ctx.fillText(label,x,y);
+  const vx=x+ctx.measureText(label).width+10;if(!value)return y;
+  setFont(ctx,'700',size,COND);const words=value.split(/\s+/);let line='';let cx=vx;
+  for(const w of words){const t=line?line+' '+w:w;
+    if(ctx.measureText(t).width>maxRight-cx&&line){ctx.fillText(line,cx,y);y+=lh;cx=nextX;line=w}else line=t}
+  if(line){if(ctx.measureText(line).width>maxRight-cx)fit(ctx,line,'700',size,COND,maxRight-cx);ctx.fillText(line,cx,y)}
+  return y;
+}
+
+function drawFront(){
+  const ctx=$('front').getContext('2d');cardBase(ctx);
+  ctx.save();rr(ctx,24,24,UW-48,UH-48,38);ctx.clip();
+  const R=rand(7);
+  [[70,392,.3],[135,380,-.4],[210,400,.6],[290,385,-.2],[365,398,.4],[455,384,-.5]].forEach(([x,y,a])=>leaf(ctx,x,y,46+R()*12,a-1.2,'rgba(47,140,80,.42)'));
+  [[1040,392,.2],[1500,394,-.6],[1440,378,.5]].forEach(([x,y,a])=>leaf(ctx,x,y,44,a-1.2,'rgba(47,140,80,.38)'));
+  tree(ctx,1222,332,78,'rgba(47,140,80,.36)');tree(ctx,1282,334,58,'rgba(47,140,80,.3)');
+  logo(ctx,imgs.emblem,168,170,122);
+  logo(ctx,imgs.dept,1417,170,122);
+  serifLine(ctx,'GOVERNMENT OF CHHATTISGARH',792,118,66,980,GREEN);
+  serifLine(ctx,'FOREST AND CLIMATE',792,206,80,980,GREEN);
+  serifLine(ctx,'CHANGE DEPARTMENT',792,290,80,980,GREEN);
+  ctx.save();setFont(ctx,'700',64,SERIF);const idw=ctx.measureText('ID CARD').width*.86;ctx.restore();
+  band(ctx,24,792-idw/2-26,338);band(ctx,792+idw/2+26,UW-24,338);
+  serifLine(ctx,'ID CARD',792,372,64,600,'#151515',.86);
+  ctx.lineWidth=3.5;ctx.strokeStyle='#1d1d1d';ctx.strokeRect(100,415,342,365);
+  const px=112,py=427,pw=318,ph=341;
+  if(imgs.photo){coverDraw(ctx,imgs.photo,px,py,pw,ph)}
+  else{ctx.save();ctx.setLineDash([12,9]);ctx.lineWidth=2.4;ctx.strokeStyle='#4a4a4a';ctx.strokeRect(px,py,pw,ph);ctx.restore();
+    setFont(ctx,'400',30,COND);ctx.fillStyle='#8a8a8a';ctx.textAlign='center';ctx.fillText('PHOTO',px+pw/2,py+ph/2+10)}
+  const h=hologram();if(h)ctx.drawImage(h,150,808,168,168);
+  const name=$('name').value.trim();
+  if(name){fit(ctx,name,'700',90,ARIMO,1000);ctx.fillStyle=GREEN;ctx.textAlign='center';ctx.fillText(name,1012,488)}
+  let y=labelValue(ctx,'Designation -',$('desig').value.trim(),505,568,54,1540,505,72);
+  y=labelValue(ctx,'Employee ID -',$('empid').value.trim(),505,y+74,54,1540,505,72);
+  y=labelValue(ctx,'Working Place -',$('place').value.trim(),505,y+74,54,1540,505,70);
+  const iy=Math.max(872,y+86);
+  setFont(ctx,'700',52,COND);ctx.fillStyle='#2b6a43';ctx.textAlign='left';ctx.fillText('Issuing Authority:',505,iy);
+  setFont(ctx,'700',62,COND);ctx.fillStyle=DARK;ctx.fillText('DFO Mohla(C.G.)',505,iy+68);
+  ctx.restore();
+}
+function drawBack(){
+  const ctx=$('back').getContext('2d');cardBase(ctx,{bottomStripe:true});
+  ctx.save();rr(ctx,24,24,UW-48,UH-48,38);ctx.clip();
+  const rows=[['Date of Birth',$('dob').value.trim()],['Blood Group',$('blood').value.trim()],['Contact',$('contact').value.trim()]];
+  rows.forEach(([l,v],i)=>{const y=185+i*92;setFont(ctx,'400',56,ARIMO);ctx.fillStyle=DARK;ctx.textAlign='left';ctx.fillText(l,110,y);ctx.fillText('-',500,y);
+    if(v){setFont(ctx,'700',56,ARIMO);ctx.fillText(v,540,y)}});
+  if(imgs.sign){const sw=420,sh=150,x=UW-110-sw,y=395;ctx.save();ctx.globalCompositeOperation='multiply';const s=Math.min(sw/imgs.sign.width,sh/imgs.sign.height);
+    ctx.drawImage(imgs.sign,x+(sw-imgs.sign.width*s)/2,y+(sh-imgs.sign.height*s)/2,imgs.sign.width*s,imgs.sign.height*s);ctx.restore()}
+  setFont(ctx,'700',46,ARIMO,'italic');ctx.textAlign='right';ctx.fillStyle='#2a2a2a';ctx.fillText("Holder's Signature",UW-110,590);
+  ctx.fillStyle='#3a3a3a';ctx.fillRect(24,610,UW-48,4);
+  const bullets=[
+    'This Card is property of "Office of the Divisional Forest Officer, Mohla (C.G.)".',
+    'This ID Card should be carried at all times of duty by the card holder.',
+    'This card is not transferable & must be returned on request.',
+    'If found, please return this card to the above address.'];
+  setFont(ctx,'400',36,ARIMO);ctx.fillStyle='#222';ctx.textAlign='left';
+  let y=672;const x0=110,x1=140,maxW=UW-110-x1;
+  bullets.forEach(b=>{ctx.beginPath();ctx.arc(x0+8,y-12,7,0,Math.PI*2);ctx.fill();
+    let line='';for(const w of b.split(' ')){const t=line?line+' '+w:w;if(ctx.measureText(t).width>maxW&&line){ctx.fillText(line,x1,y);y+=46;line=w}else line=t}
+    ctx.fillText(line,x1,y);y+=58});
+  ctx.restore();
+}
+function draw(){drawFront();drawBack()}
+
+function pick(inputId,key,labelId){
+  $(inputId).addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(!f)return;
+    const rd=new FileReader();
+    rd.onload=()=>{const i=new Image();i.onload=()=>{imgs[key]=i;$(labelId).textContent=f.name;draw();status('')};
+      i.onerror=()=>status('Yeh photo khul nahi payi. JPG ya PNG photo chuniye.');i.src=rd.result};
+    rd.readAsDataURL(f);
+  });
+}
+pick('photo','photo','photoN');pick('sign','sign','signN');
+['name','desig','empid','place','dob','blood','contact'].forEach(id=>$(id).addEventListener('input',draw));
+$('clear').addEventListener('click',()=>{
+  ['name','desig','empid','dob','blood','contact'].forEach(id=>$(id).value='');
+  $('place').value='Office of the Divisional Forest Officer Mohla(C.G.)';
+  delete imgs.photo;delete imgs.sign;$('photo').value='';$('sign').value='';
+  $('photoN').textContent='koi photo nahi';$('signN').textContent='koi sign nahi';draw();status('Naya card ke liye form khali hai.');
+});
+const base=()=>'ID_Card_'+($('name').value.trim()||'employee').replace(/[^\w]+/g,'_');
+async function save(filename,blob){
+  if(IN_CLAUDE){
+    const dl=await window.claude.use('downloads');
+    if(!dl){status('Is view mein download nahi ho sakta.');return}
+    try{await dl.save({filename,data:blob});status('Card save ho gaya.')}
+    catch(err){status(err&&err.code==='declined'?'Download cancel kiya gaya.':'Download nahi hua, dobara try kariye.')}
+    return;
+  }
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);status('Card download ho gaya: '+filename);
+}
+$('pngF').addEventListener('click',()=>{draw();$('front').toBlob(b=>save(base()+'_Front.png',b),'image/png')});
+$('pngB').addEventListener('click',()=>{draw();$('back').toBlob(b=>save(base()+'_Back.png',b),'image/png')});
+$('pdf').addEventListener('click',()=>{
+  if(!window.jspdf){status('PDF tool load nahi hua, internet check karke page reload kariye.');return}
+  draw();status('PDF ban rahi hai…');
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:[85.6,54]});
+  doc.addImage($('front').toDataURL('image/jpeg',.95),'JPEG',0,0,85.6,54);
+  doc.addPage([85.6,54],'landscape');
+  doc.addImage($('back').toDataURL('image/jpeg',.95),'JPEG',0,0,85.6,54);
+  save(base()+'.pdf',doc.output('blob'));
+});
+
+(async()=>{
+  await Promise.all([load('emblem','emblem.png'),load('dept','dept.png')]);
+  draw();
+  try{await Promise.all(['700 50px "Noto Serif"','700 50px Arimo','400 50px Arimo','italic 700 50px Arimo','700 50px "Roboto Condensed"','400 50px "Roboto Condensed"'].map(f=>document.fonts.load(f)))}catch(_){}
+  draw();
+})();
+</script>
+</body>
+</html>
