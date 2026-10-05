@@ -104,9 +104,9 @@ input[type=password]{font:inherit;font-size:17px;color:var(--fg);background:var(
     </form>
     <div class="preview">
       <div class="side">Front</div>
-      <canvas id="front" width="4096" height="2584" aria-label="ID card front preview"></canvas>
+      <canvas id="front" width="1981" height="1250" aria-label="ID card front preview"></canvas>
       <div class="side">Back</div>
-      <canvas id="back" width="4096" height="2584" aria-label="ID card back preview"></canvas>
+      <canvas id="back" width="1981" height="1250" aria-label="ID card back preview"></canvas>
       <p class="hint">PDF asli card size (85.6 × 54 mm) mein do page ki banti hai: page 1 front, page 2 back. PVC card printer ya A4 par seedha print kariye.</p>
     </div>
   </div>
@@ -119,14 +119,14 @@ const UW=1585, UH=1000, W=4096, H=2584, K=W/UW;
 const GREEN='#1d5a35', DARK='#1b1b1b';
 const SERIF='"Noto Serif", Georgia, serif', ARIMO='Arimo, Arial, sans-serif', COND='"Roboto Condensed","Arial Narrow",sans-serif';
 const IN_CLAUDE=!!(window.claude&&window.claude.use);
-// Login (ID: Dfo, Password: password.2026). Only a hash is stored here.
-const PASS_HASH='97ca4dcd7e91374169176035f2493f017c6c11f31839eff2d1ca34b5b8ea9d41';
+// Login (ID: Dfo, Password: 2026). Only a hash is stored here.
+const PASS_HASH='98b8e4223be9c4f3c4523d14003ef1f333ca41d2e3e28402294d8332ad292d96';
 async function sha(t){if(!(window.crypto&&crypto.subtle))return null;const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 function ss(k,v){try{if(v===undefined)return sessionStorage.getItem(k);if(v===null)sessionStorage.removeItem(k);else sessionStorage.setItem(k,v)}catch(_){return null}}
 function showApp(){$('login').hidden=true;$('app').hidden=false;setTimeout(draw,0)}
 if(ss('idc_ok')===PASS_HASH)showApp();
 $('login').addEventListener('submit',async()=>{
-  const h=await sha($('lid').value.trim().toLowerCase()+':'+$('lpw').value);
+  const h=await sha($('lid').value.trim().toLowerCase()+':'+$('lpw').value.trim());
   if(h===PASS_HASH){ss('idc_ok',h);$('lerr').hidden=true;showApp()}else{$('lerr').hidden=false}
 });
 $('logout').addEventListener('click',()=>{ss('idc_ok',null);$('lpw').value='';$('app').hidden=true;$('login').hidden=false});
@@ -144,8 +144,17 @@ function serifLine(ctx,text,cx,y,size,maxW,color,sx=.82){
 }
 function rand(seed){return()=>{seed=(seed*16807)%2147483647;return seed/2147483647}}
 
-function cardBase(ctx,{bottomStripe=false}={}){
-  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,W,H);ctx.scale(K,K);
+const baseCache={};
+function cardBase(ctx,k,{bottomStripe=false}={}){
+  const key=k+'-'+bottomStripe+'-'+!!imgs.emblem;
+  if(!baseCache[key]){
+    const c=document.createElement('canvas');c.width=Math.round(UW*k);c.height=Math.round(UH*k);
+    const b=c.getContext('2d');b.scale(k,k);paintBase(b,bottomStripe);baseCache[key]=c;
+  }
+  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  ctx.drawImage(baseCache[key],0,0);ctx.scale(k,k);
+}
+function paintBase(ctx,bottomStripe){
   const g=ctx.createLinearGradient(0,0,UW,UH);g.addColorStop(0,'#1f7a43');g.addColorStop(.5,'#2f9a58');g.addColorStop(1,'#1d6e3d');
   rr(ctx,0,0,UW,UH,58);ctx.fillStyle=g;ctx.fill();
   rr(ctx,14,14,UW-28,UH-28,46);ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=2;ctx.stroke();
@@ -236,8 +245,8 @@ function labelValue(ctx,label,value,x,y,size,maxRight,nextX,lh){
   return y;
 }
 
-function drawFront(){
-  const ctx=$('front').getContext('2d');cardBase(ctx);
+function drawFront(ctx,k){
+  cardBase(ctx,k);
   ctx.save();rr(ctx,24,24,UW-48,UH-48,38);ctx.clip();
   const R=rand(7);
   [[70,392,.3],[135,380,-.4],[210,400,.6],[290,385,-.2],[365,398,.4],[455,384,-.5]].forEach(([x,y,a])=>leaf(ctx,x,y,46+R()*12,a-1.2,'rgba(47,140,80,.42)'));
@@ -267,8 +276,8 @@ function drawFront(){
   setFont(ctx,'700',62,COND);ctx.fillStyle=DARK;ctx.fillText('DFO Mohla(C.G.)',505,iy+68);
   ctx.restore();
 }
-function drawBack(){
-  const ctx=$('back').getContext('2d');cardBase(ctx,{bottomStripe:true});
+function drawBack(ctx,k){
+  cardBase(ctx,k,{bottomStripe:true});
   ctx.save();rr(ctx,24,24,UW-48,UH-48,38);ctx.clip();
   const rows=[['Date of Birth',$('dob').value.trim()],['Blood Group',$('blood').value.trim()],['Contact',$('contact').value.trim()]];
   rows.forEach(([l,v],i)=>{const y=185+i*92;setFont(ctx,'400',56,ARIMO);ctx.fillStyle=DARK;ctx.textAlign='left';ctx.fillText(l,110,y);ctx.fillText('-',500,y);
@@ -289,18 +298,27 @@ function drawBack(){
     ctx.fillText(line,x1,y);y+=58});
   ctx.restore();
 }
-function draw(){drawFront();drawBack()}
+const PK=1.25; // preview: 1981 px wide, sharp on phones; downloads use full 4K
+function draw(){drawFront($('front').getContext('2d'),PK);drawBack($('back').getContext('2d'),PK)}
+let pending=false;
+function drawSoon(){if(pending)return;pending=true;requestAnimationFrame(()=>{pending=false;draw()})}
+function render4k(side){const c=document.createElement('canvas');c.width=W;c.height=H;
+  (side==='front'?drawFront:drawBack)(c.getContext('2d'),K);return c}
+// big phone photos (12 MP+) are shrunk once so the card redraws fast
+function shrink(img,max){const s=Math.min(1,max/Math.max(img.width,img.height));if(s>=1)return img;
+  const c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);
+  c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c}
 
 function pick(inputId,key,labelId){
   $(inputId).addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(!f)return;
     const rd=new FileReader();
-    rd.onload=()=>{const i=new Image();i.onload=()=>{imgs[key]=i;$(labelId).textContent=f.name;draw();status('')};
+    rd.onload=()=>{const i=new Image();i.onload=()=>{imgs[key]=shrink(i,1400);$(labelId).textContent=f.name;drawSoon();status('')};
       i.onerror=()=>status('Yeh photo khul nahi payi. JPG ya PNG photo chuniye.');i.src=rd.result};
     rd.readAsDataURL(f);
   });
 }
 pick('photo','photo','photoN');pick('sign','sign','signN');
-['name','desig','empid','place','dob','blood','contact'].forEach(id=>$(id).addEventListener('input',draw));
+['name','desig','empid','place','dob','blood','contact'].forEach(id=>$(id).addEventListener('input',drawSoon));
 $('clear').addEventListener('click',()=>{
   ['name','desig','empid','dob','blood','contact'].forEach(id=>$(id).value='');
   $('place').value='Office of the Divisional Forest Officer Mohla(C.G.)';
@@ -319,16 +337,18 @@ async function save(filename,blob){
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);status('Card download ho gaya: '+filename);
 }
-$('pngF').addEventListener('click',()=>{draw();$('front').toBlob(b=>save(base()+'_Front.png',b),'image/png')});
-$('pngB').addEventListener('click',()=>{draw();$('back').toBlob(b=>save(base()+'_Back.png',b),'image/png')});
+$('pngF').addEventListener('click',()=>{status('4K card ban raha hai…');setTimeout(()=>render4k('front').toBlob(b=>save(base()+'_Front.png',b),'image/png'),30)});
+$('pngB').addEventListener('click',()=>{status('4K card ban raha hai…');setTimeout(()=>render4k('back').toBlob(b=>save(base()+'_Back.png',b),'image/png'),30)});
 $('pdf').addEventListener('click',()=>{
   if(!window.jspdf){status('PDF tool load nahi hua, internet check karke page reload kariye.');return}
-  draw();status('PDF ban rahi hai…');
+  status('PDF ban rahi hai…');
+  setTimeout(()=>{
   const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:[85.6,54]});
-  doc.addImage($('front').toDataURL('image/jpeg',.95),'JPEG',0,0,85.6,54);
+  doc.addImage(render4k('front').toDataURL('image/jpeg',.95),'JPEG',0,0,85.6,54);
   doc.addPage([85.6,54],'landscape');
-  doc.addImage($('back').toDataURL('image/jpeg',.95),'JPEG',0,0,85.6,54);
+  doc.addImage(render4k('back').toDataURL('image/jpeg',.95),'JPEG',0,0,85.6,54);
   save(base()+'.pdf',doc.output('blob'));
+  },30);
 });
 
 (async()=>{
